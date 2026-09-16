@@ -1,0 +1,4 @@
+# Preserve numerical exports byte-for-byte and avoid whitespace lint on them.
+*.dat -text -whitespace
+*.pdf binary
+*.bmp binary

@@ -157,13 +157,16 @@ def main() -> None:
         candidate = image_path.with_name(f"{image_path.stem}_aniso.dat")
         vendor_path = candidate if candidate.exists() else None
     vendor_summary = None
+    vendor_comparison = None
     if vendor_path is not None and vendor_path.exists():
         vendor = np.loadtxt(vendor_path, dtype=float)
         vendor_summary = {"path": str(vendor_path.resolve()), "shape": list(vendor.shape), "columns": int(vendor.shape[1])}
         # The legacy Basex aniso.dat format used here is radius, beta_2, beta_4, beta_6.
         # Compare equal Legendre orders; comparing these with beta_1..beta_3 is invalid.
         vendor_orders = (2, 4, 6)
-        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+        fig, axes = plt.subplots(2, 1, figsize=(9, 8), sharex=True, constrained_layout=True)
+        ax = axes[0]
+        comparison_rows = []
         for j, order in enumerate(vendor_orders, start=1):
             if j >= vendor.shape[1]:
                 break
@@ -179,14 +182,44 @@ def main() -> None:
                     label=f"PyAbel $\\beta_{order}$",
                     lw=1,
                 )
-        ax.set_xlabel("radius (pixel)")
-        ax.set_ylabel("anisotropy coefficient")
-        ax.set_title("Matching even anisotropy coefficients: Basex vs PyAbel")
+                py_intensity = np.interp(vendor[:, 0], radius, intensity)
+                valid = np.isfinite(vendor[:, j]) & np.isfinite(py_values)
+                valid &= py_intensity > 0.20 * np.nanmax(intensity)
+                if np.count_nonzero(valid) >= 3:
+                    comparison_rows.append(
+                        {
+                            "order": order,
+                            "points": int(np.count_nonzero(valid)),
+                            "pearson_r": float(np.corrcoef(vendor[valid, j], py_values[valid])[0, 1]),
+                            "median_abs_error": float(np.median(np.abs(vendor[valid, j] - py_values[valid]))),
+                        }
+                    )
+        ax.set_ylabel("coefficient (full range)")
+        ax.set_title("Basex vs PyAbel: same Legendre orders")
         ax.axhline(0, color="black", lw=0.7)
-        ax.legend(fontsize=9)
+        ax.legend(fontsize=9, ncol=3)
+        ax.grid(alpha=0.25)
+
+        # A zoomed panel excludes the low-signal radii where beta=c_l/c_0 is unstable.
+        ax = axes[1]
+        for j, order in enumerate(vendor_orders, start=1):
+            if j >= vendor.shape[1] or order - 1 >= beta.shape[0]:
+                continue
+            py_values = np.interp(vendor[:, 0], radius, beta[order - 1])
+            py_intensity = np.interp(vendor[:, 0], radius, intensity)
+            valid = np.isfinite(vendor[:, j]) & np.isfinite(py_values)
+            valid &= py_intensity > 0.20 * np.nanmax(intensity)
+            ax.plot(vendor[valid, 0], vendor[valid, j], label=f"Basex $\\beta_{order}$", lw=1)
+            ax.plot(vendor[valid, 0], py_values[valid], linestyle="--", label=f"PyAbel $\\beta_{order}$", lw=1)
+        ax.set_xlabel("radius (pixel)")
+        ax.set_ylabel("coefficient (I > 20% max)")
+        ax.set_title("High-signal comparison (low-signal spikes excluded)")
+        ax.axhline(0, color="black", lw=0.7)
+        ax.legend(fontsize=8, ncol=3)
         ax.grid(alpha=0.25)
         fig.savefig(outdir / "vendor_aniso.png", dpi=160)
         plt.close(fig)
+        vendor_comparison = comparison_rows
 
     summary = {
         "input": str(image_path),
@@ -202,6 +235,7 @@ def main() -> None:
         "interpretation": "A single image cannot provide quantitative LCP/RCP PECD. The odd component is a symmetry/QC diagnostic only.",
         "vendor_aniso": vendor_summary,
         "vendor_aniso_columns": ["radius_px", "beta_2", "beta_4", "beta_6"] if vendor_summary else None,
+        "vendor_comparison_high_signal": vendor_comparison,
     }
     (outdir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

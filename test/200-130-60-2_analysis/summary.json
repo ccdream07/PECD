@@ -1,0 +1,53 @@
+{
+  "input": "C:\\Users\\14815\\Desktop\\vscodeproject\\PECD\\test\\200-130-60-2.dat",
+  "input_shape": [
+    1024,
+    1024
+  ],
+  "origin_row_col": [
+    505,
+    507
+  ],
+  "method": "PyAbel rBasex",
+  "order": 6,
+  "rmax": "MIN",
+  "radial_points": 517,
+  "qc_intensity_threshold_fraction": 0.01,
+  "median_abs_odd_coefficients": 0.17618365813715783,
+  "median_abs_even_coefficients": 0.5749216037543083,
+  "interpretation": "A single image cannot provide quantitative LCP/RCP PECD. The odd component is a symmetry/QC diagnostic only.",
+  "vendor_aniso": {
+    "path": "C:\\Users\\14815\\Desktop\\vscodeproject\\PECD\\test\\200-130-60-2_aniso.dat",
+    "shape": [
+      999,
+      4
+    ],
+    "columns": 4
+  },
+  "vendor_aniso_columns": [
+    "radius_px",
+    "beta_2",
+    "beta_4",
+    "beta_6"
+  ],
+  "vendor_comparison_high_signal": [
+    {
+      "order": 2,
+      "points": 46,
+      "pearson_r": 0.9870337839845852,
+      "median_abs_error": 0.0792346005721569
+    },
+    {
+      "order": 4,
+      "points": 46,
+      "pearson_r": 0.7228522246451374,
+      "median_abs_error": 0.13095670327018222
+    },
+    {
+      "order": 6,
+      "points": 46,
+      "pearson_r": 0.816364319399636,
+      "median_abs_error": 0.14994027672457988
+    }
+  ]
+}

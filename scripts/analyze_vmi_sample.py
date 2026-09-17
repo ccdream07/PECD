@@ -27,7 +27,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outdir", type=Path, default=None, help="output directory")
     parser.add_argument("--center-row", type=float, default=None)
     parser.add_argument("--center-col", type=float, default=None)
-    parser.add_argument("--order", type=int, default=4, help="highest Legendre order")
+    parser.add_argument(
+        "--order",
+        type=int,
+        default=6,
+        help="highest Legendre order (6 matches the vendor aniso.dat output)",
+    )
     parser.add_argument("--rmax", default="MIN", help="rBasex radial limit")
     parser.add_argument(
         "--vendor-aniso",
@@ -104,7 +109,8 @@ def main() -> None:
     positive = intensity > max(float(np.nanmax(intensity)) * valid_fraction, 0.0)
     if np.any(positive):
         odd_abs = np.nanmedian(np.abs(beta[[0, 2]][:, positive])) if beta.shape[0] >= 3 else float("nan")
-        even_abs = np.nanmedian(np.abs(beta[[1, 3]][:, positive])) if beta.shape[0] >= 4 else float("nan")
+        even_indices = [i for i in (1, 3, 5) if i < beta.shape[0]]
+        even_abs = np.nanmedian(np.abs(beta[even_indices][:, positive])) if even_indices else float("nan")
         odd_component = 2 * beta[0] - 0.5 * beta[2] if beta.shape[0] >= 3 else np.full_like(radius, np.nan)
     else:
         odd_abs = even_abs = float("nan")
@@ -154,12 +160,29 @@ def main() -> None:
     if vendor_path is not None and vendor_path.exists():
         vendor = np.loadtxt(vendor_path, dtype=float)
         vendor_summary = {"path": str(vendor_path.resolve()), "shape": list(vendor.shape), "columns": int(vendor.shape[1])}
+        # The legacy Basex aniso.dat format used here is radius, beta_2, beta_4, beta_6.
+        # Compare equal Legendre orders; comparing these with beta_1..beta_3 is invalid.
+        vendor_orders = (2, 4, 6)
         fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-        for j in range(1, vendor.shape[1]):
-            ax.plot(vendor[:, 0], vendor[:, j], label=f"Basex column {j}", lw=1)
+        for j, order in enumerate(vendor_orders, start=1):
+            if j >= vendor.shape[1]:
+                break
+            ax.plot(vendor[:, 0], vendor[:, j], label=f"Basex $\\beta_{order}$", lw=1)
+            py_index = order - 1
+            if py_index < beta.shape[0]:
+                py_values = np.interp(vendor[:, 0], radius, beta[py_index])
+                ax.plot(
+                    vendor[:, 0],
+                    py_values,
+                    linestyle="--",
+                    alpha=0.8,
+                    label=f"PyAbel $\\beta_{order}$",
+                    lw=1,
+                )
         ax.set_xlabel("radius (pixel)")
-        ax.set_ylabel("vendor Basex value")
-        ax.set_title("Vendor Basex anisotropy output; column meanings not assumed")
+        ax.set_ylabel("anisotropy coefficient")
+        ax.set_title("Matching even anisotropy coefficients: Basex vs PyAbel")
+        ax.axhline(0, color="black", lw=0.7)
         ax.legend(fontsize=9)
         ax.grid(alpha=0.25)
         fig.savefig(outdir / "vendor_aniso.png", dpi=160)
@@ -178,6 +201,7 @@ def main() -> None:
         "median_abs_even_coefficients": None if not np.isfinite(even_abs) else float(even_abs),
         "interpretation": "A single image cannot provide quantitative LCP/RCP PECD. The odd component is a symmetry/QC diagnostic only.",
         "vendor_aniso": vendor_summary,
+        "vendor_aniso_columns": ["radius_px", "beta_2", "beta_4", "beta_6"] if vendor_summary else None,
     }
     (outdir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))

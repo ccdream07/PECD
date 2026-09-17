@@ -47,6 +47,34 @@ python scripts\analyze_vmi_sample.py test\200-130-60-2.dat --center-row 505 --ce
 - `single_image_odd_component.csv`
 - `summary.json`
 
+## Basex 对照验证（2026-09-17）
+
+之前的 `vendor_aniso.png` 把旧 Basex 的三列仅标作 column 1--3，并与 PyAbel 的
+`beta_1`--`beta_3` 放在同一张图中。这种比较是不成立的，因为两边的列不是同一阶
+Legendre 系数。
+
+对 `200-130-60-2_polar.dat` 按每个半径拟合
+
+\[
+I(r,\theta)=c_0(r)+c_2(r)P_2(\cos\theta)+c_4(r)P_4(\cos\theta)+c_6(r)P_6(\cos\theta),
+\]
+
+并计算 `beta_l=c_l/c_0` 后，结果与 `200-130-60-2_aniso.dat` 的三列逐点吻合：
+中位绝对误差约为 `2.4e-6`、`2.5e-6`、`3.1e-6`，相关系数分别大于
+`0.9999998`。因此该 Basex 文件的列定义为
+
+```text
+radius_px, beta_2, beta_4, beta_6
+```
+
+程序现在默认使用 `order=6`，并在 `vendor_aniso.png` 中把 Basex 的
+`beta_2/beta_4/beta_6` 与 PyAbel 的同阶系数叠加比较。比较时必须统一中心、半径坐标、
+背景处理、阶数和正则化。当前样例在高信号半径内的趋势基本一致；大半径和零信号区的
+巨大尖峰是系数除以很小的 `c_0` 后放大的反演噪声，应按强度/SNR 阈值剔除。
+
+这验证了旧 Basex 输出的列含义，但没有证明 PyAbel 与旧 Basex 在所有参数下完全等价。
+正式 PECD 仍需成对的 LCP/RCP 图像；单张图的奇数项只能作为对称性和数据质量检查。
+
 ## 重要限制
 
 单张图像不能计算定量 PECD。程序输出的
@@ -67,4 +95,3 @@ python scripts\analyze_vmi_sample.py test\200-130-60-2.dat --center-row 505 --ce
 \[
 \mathrm{PECD}=2\beta_1^{\mathrm{odd}}-\frac12\beta_3^{\mathrm{odd}}.
 \]
-
